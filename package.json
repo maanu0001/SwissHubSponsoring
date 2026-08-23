@@ -1,0 +1,60 @@
+{
+  "name": "swisshub-sponsoring",
+  "version": "1.0.0",
+  "private": true,
+  "description": "SwissHub Sponsoring Platform \u2013 Sponsor CRM, CMS and generator for individual sponsoring pages",
+  "engines": {
+    "node": ">=20.9.0"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "prisma generate && next build",
+    "start": "next start",
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:studio": "prisma studio",
+    "db:push": "prisma db push",
+    "seed": "tsx --conditions=react-server prisma/seed.ts",
+    "admin:create": "tsx --conditions=react-server scripts/create-admin.ts",
+    "admin:password": "tsx --conditions=react-server scripts/reset-password.ts",
+    "lint:fix": "eslint src --fix"
+  },
+  "prisma": {
+    "seed": "tsx --conditions=react-server prisma/seed.ts"
+  },
+  "dependencies": {
+    "@dnd-kit/core": "6.3.1",
+    "@dnd-kit/modifiers": "9.0.0",
+    "@dnd-kit/sortable": "10.0.0",
+    "@dnd-kit/utilities": "3.2.2",
+    "@prisma/client": "6.19.3",
+    "bcryptjs": "3.0.3",
+    "clsx": "2.1.1",
+    "next": "15.5.23",
+    "react": "19.1.9",
+    "react-dom": "19.1.9",
+    "sanitize-html": "2.17.7",
+    "server-only": "^0.0.1",
+    "tailwind-merge": "2.6.0",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3.3.6",
+    "@tailwindcss/typography": "0.5.16",
+    "@types/node": "22.18.11",
+    "@types/react": "19.1.13",
+    "@types/react-dom": "19.1.9",
+    "@types/sanitize-html": "2.16.0",
+    "autoprefixer": "10.4.21",
+    "eslint": "9.37.0",
+    "eslint-config-next": "15.5.23",
+    "postcss": "8.5.6",
+    "prisma": "6.19.3",
+    "tailwindcss": "3.4.19",
+    "tsx": "4.20.6",
+    "typescript": "5.9.3"
+  }
+}

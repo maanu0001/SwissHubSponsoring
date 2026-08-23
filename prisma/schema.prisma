@@ -1,0 +1,510 @@
+// SwissHub Sponsoring Platform – data model
+// PostgreSQL + Prisma ORM
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum SponsorStatus {
+  DRAFT
+  NOT_CONTACTED
+  CONTACTED
+  IN_TALKS
+  CONFIRMED
+  DECLINED
+  ARCHIVED
+}
+
+enum PageStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum PageVisibility {
+  PUBLIC
+  PASSWORD_PROTECTED
+}
+
+enum SupportType {
+  MONEY
+  PRIZES
+  GAME_KEYS
+  HARDWARE
+  SERVICES
+  COMBINATION
+  OTHER
+}
+
+enum TournamentStatus {
+  PLANNED
+  OPEN
+  RUNNING
+  COMPLETED
+  ARCHIVED
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+  DOCUMENT
+}
+
+enum MediaSourceType {
+  UPLOAD
+  EXTERNAL
+}
+
+enum TemplateType {
+  STANDARD
+  MAIN_SPONSOR
+  HARDWARE_PARTNER
+  KEY_GIVEAWAY_PARTNER
+  IT_TECH_PARTNER
+  CUSTOM
+}
+
+/// Section kinds usable on individual sponsor pages and – where meaningful –
+/// on the public main page. New kinds can be added without a data migration
+/// because unknown kinds fall back to the generic renderer.
+enum SectionType {
+  HERO
+  PERSONAL_INTRO
+  WHY_PARTNERSHIP
+  TOURNAMENT
+  REACH
+  SPONSORING_PROPOSAL
+  BENEFITS
+  BUDGET_USAGE
+  VISION
+  ABOUT_SWISSHUB
+  TOURNAMENT_HISTORY
+  PAST_PARTNERS
+  TWITCH_VOD
+  SOCIAL_PROOF
+  CTA
+  CUSTOM_TEXT
+  GALLERY
+  STATS
+  PROCESS
+  CONTACT
+  RICH_TEXT
+}
+
+enum SettingType {
+  STRING
+  TEXT
+  NUMBER
+  BOOLEAN
+  JSON
+  COLOR
+  MEDIA
+  HTML
+}
+
+enum ActivityAction {
+  LOGIN
+  LOGOUT
+  LOGIN_FAILED
+  CREATE
+  UPDATE
+  DELETE
+  ARCHIVE
+  RESTORE
+  STATUS_CHANGE
+  PUBLISH
+  UNPUBLISH
+  PASSWORD_SET
+  PASSWORD_REMOVED
+  UPLOAD
+}
+
+// ---------------------------------------------------------------------------
+// Auth
+// ---------------------------------------------------------------------------
+
+model AdminUser {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  name         String
+  active       Boolean   @default(true)
+  lastLogin    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  sessions   Session[]
+  activities ActivityLog[]
+
+  @@map("admin_users")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  /// SHA-256 of the raw session token. The raw token only ever lives in the cookie.
+  tokenHash String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  lastSeen  DateTime @default(now())
+  userAgent String?
+
+  user AdminUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+/// Login throttling that survives restarts and works across multiple app instances.
+model LoginAttempt {
+  id        String   @id @default(cuid())
+  /// Hashed identifier (email + ip) – no raw personal data is stored.
+  key       String
+  createdAt DateTime @default(now())
+
+  @@index([key, createdAt])
+  @@map("login_attempts")
+}
+
+// ---------------------------------------------------------------------------
+// Media
+// ---------------------------------------------------------------------------
+
+model Media {
+  id          String          @id @default(cuid())
+  title       String
+  altText     String?
+  type        MediaType       @default(IMAGE)
+  sourceType  MediaSourceType @default(UPLOAD)
+  /// Relative path inside UPLOAD_DIR (never an absolute path).
+  filePath    String?
+  externalUrl String?
+  mimeType    String?
+  fileSize    Int?
+  width       Int?
+  height      Int?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  sponsorLogos      Sponsor[]         @relation("SponsorLogo")
+  sponsorPageHeroes SponsorPage[]     @relation("SponsorPageHero")
+  tournamentHeroes  Tournament[]      @relation("TournamentHero")
+  partnerLogos      PartnerReference[]
+  tournamentMedia   TournamentMedia[]
+
+  @@index([type])
+  @@index([createdAt])
+  @@map("media")
+}
+
+// ---------------------------------------------------------------------------
+// Sponsors (CRM)
+// ---------------------------------------------------------------------------
+
+model Sponsor {
+  id              String        @id @default(cuid())
+  companyName     String
+  slug            String        @unique
+  logoId          String?
+  website         String?
+  industry        String?
+  contactName     String?
+  contactEmail    String?
+  contactPhone    String?
+  internalNotes   String?
+  status          SponsorStatus @default(DRAFT)
+  lastContactDate DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  logo  Media?        @relation("SponsorLogo", fields: [logoId], references: [id], onDelete: SetNull)
+  pages SponsorPage[]
+
+  @@index([status])
+  @@index([updatedAt])
+  @@index([companyName])
+  @@map("sponsors")
+}
+
+// ---------------------------------------------------------------------------
+// Tournaments
+// ---------------------------------------------------------------------------
+
+model Tournament {
+  id                       String           @id @default(cuid())
+  title                    String
+  slug                     String           @unique
+  game                     String
+  description              String?
+  startDate                DateTime?
+  endDate                  DateTime?
+  format                   String?
+  participantCount         Int?
+  expectedParticipantCount Int?
+  streamViewerCount        Int?
+  status                   TournamentStatus @default(PLANNED)
+  twitchUrl                String?
+  vodUrl                   String?
+  heroImageId              String?
+  internalNotes            String?
+  featured                 Boolean          @default(true)
+  order                    Int              @default(0)
+  createdAt                DateTime         @default(now())
+  updatedAt                DateTime         @updatedAt
+
+  heroImage Media?            @relation("TournamentHero", fields: [heroImageId], references: [id], onDelete: SetNull)
+  media     TournamentMedia[]
+  pages     SponsorPage[]
+
+  @@index([status])
+  @@index([startDate])
+  @@map("tournaments")
+}
+
+model TournamentMedia {
+  id           String @id @default(cuid())
+  tournamentId String
+  mediaId      String
+  order        Int    @default(0)
+
+  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  mediaItem  Media      @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+
+  @@unique([tournamentId, mediaId])
+  @@index([tournamentId, order])
+  @@map("tournament_media")
+}
+
+// ---------------------------------------------------------------------------
+// Benefits catalogue
+// ---------------------------------------------------------------------------
+
+model SponsoringBenefit {
+  id             String   @id @default(cuid())
+  title          String
+  description    String?
+  category       String   @default("Allgemein")
+  icon           String?
+  active         Boolean  @default(true)
+  defaultBenefit Boolean  @default(false)
+  order          Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  pageBenefits     SponsorPageBenefit[]
+  templateDefaults PageTemplateBenefit[]
+
+  @@index([category, order])
+  @@map("sponsoring_benefits")
+}
+
+// ---------------------------------------------------------------------------
+// Templates
+// ---------------------------------------------------------------------------
+
+model PageTemplate {
+  id          String       @id @default(cuid())
+  name        String
+  slug        String       @unique
+  description String?
+  type        TemplateType @default(STANDARD)
+  active      Boolean      @default(true)
+  order       Int          @default(0)
+  /// Blueprint: { sections: [...], defaultCta: {...}, layout: "..." }
+  structure   Json
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  pages           SponsorPage[]
+  defaultBenefits PageTemplateBenefit[]
+
+  @@map("page_templates")
+}
+
+model PageTemplateBenefit {
+  id         String @id @default(cuid())
+  templateId String
+  benefitId  String
+  order      Int    @default(0)
+
+  template PageTemplate      @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  benefit  SponsoringBenefit @relation(fields: [benefitId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, benefitId])
+  @@map("page_template_benefits")
+}
+
+// ---------------------------------------------------------------------------
+// Sponsor pages
+// ---------------------------------------------------------------------------
+
+model SponsorPage {
+  id                  String         @id @default(cuid())
+  sponsorId           String
+  tournamentId        String?
+  templateId          String?
+  slug                String         @unique
+  title               String
+  subtitle            String?
+  status              PageStatus     @default(DRAFT)
+  visibility          PageVisibility @default(PUBLIC)
+  passwordHash        String?
+  requestedSupportType SupportType   @default(MONEY)
+  requestedAmount     Decimal?       @db.Decimal(12, 2)
+  requestedSupportText String?
+  currency            String         @default("CHF")
+  heroImageId         String?
+  noindex             Boolean        @default(true)
+  viewCount           Int            @default(0)
+  lastViewedAt        DateTime?
+  publishedAt         DateTime?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
+  sponsor    Sponsor              @relation(fields: [sponsorId], references: [id], onDelete: Cascade)
+  tournament Tournament?          @relation(fields: [tournamentId], references: [id], onDelete: SetNull)
+  template   PageTemplate?        @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  heroImage  Media?               @relation("SponsorPageHero", fields: [heroImageId], references: [id], onDelete: SetNull)
+  sections   SponsorPageSection[]
+  benefits   SponsorPageBenefit[]
+  views      PageViewDaily[]
+
+  @@index([status])
+  @@index([sponsorId])
+  @@index([updatedAt])
+  @@map("sponsor_pages")
+}
+
+model SponsorPageSection {
+  id            String      @id @default(cuid())
+  sponsorPageId String
+  type          SectionType
+  title         String?
+  subtitle      String?
+  /// Sanitised rich-text (HTML) or plain text depending on the section kind.
+  content       String?
+  /// Section specific payload, e.g. stats, gallery items, CTA config.
+  data          Json?
+  order         Int         @default(0)
+  visible       Boolean     @default(true)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  page SponsorPage @relation(fields: [sponsorPageId], references: [id], onDelete: Cascade)
+
+  @@index([sponsorPageId, order])
+  @@map("sponsor_page_sections")
+}
+
+model SponsorPageBenefit {
+  id                String  @id @default(cuid())
+  sponsorPageId     String
+  benefitId         String
+  customTitle       String?
+  customDescription String?
+  order             Int     @default(0)
+  visible           Boolean @default(true)
+
+  page    SponsorPage       @relation(fields: [sponsorPageId], references: [id], onDelete: Cascade)
+  benefit SponsoringBenefit @relation(fields: [benefitId], references: [id], onDelete: Cascade)
+
+  @@unique([sponsorPageId, benefitId])
+  @@index([sponsorPageId, order])
+  @@map("sponsor_page_benefits")
+}
+
+/// Privacy friendly, aggregated page views – no IP address, no fingerprinting.
+model PageViewDaily {
+  id            String   @id @default(cuid())
+  sponsorPageId String
+  day           DateTime @db.Date
+  count         Int      @default(0)
+
+  page SponsorPage @relation(fields: [sponsorPageId], references: [id], onDelete: Cascade)
+
+  @@unique([sponsorPageId, day])
+  @@map("page_views_daily")
+}
+
+// ---------------------------------------------------------------------------
+// Public site content (CMS)
+// ---------------------------------------------------------------------------
+
+model PartnerReference {
+  id          String   @id @default(cuid())
+  name        String
+  logoId      String?
+  website     String?
+  description String?
+  order       Int      @default(0)
+  visible     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  logo Media? @relation(fields: [logoId], references: [id], onDelete: SetNull)
+
+  @@index([order])
+  @@map("partner_references")
+}
+
+model SiteSection {
+  id        String      @id @default(cuid())
+  /// Stable identifier used by seeds and code (e.g. "hero", "stats").
+  key       String      @unique
+  type      SectionType
+  title     String?
+  subtitle  String?
+  content   String?
+  data      Json?
+  order     Int         @default(0)
+  visible   Boolean     @default(true)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@index([order])
+  @@map("site_sections")
+}
+
+model SiteSetting {
+  key       String      @id
+  value     String
+  type      SettingType @default(STRING)
+  label     String?
+  group     String      @default("general")
+  order     Int         @default(0)
+  updatedAt DateTime    @updatedAt
+
+  @@index([group, order])
+  @@map("site_settings")
+}
+
+// ---------------------------------------------------------------------------
+// Audit log
+// ---------------------------------------------------------------------------
+
+model ActivityLog {
+  id         String         @id @default(cuid())
+  userId     String?
+  action     ActivityAction
+  entityType String
+  entityId   String?
+  summary    String
+  metadata   Json?
+  createdAt  DateTime       @default(now())
+
+  user AdminUser? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([entityType, entityId])
+  @@map("activity_logs")
+}

@@ -1,0 +1,70 @@
+# SwissHub Sponsoring – Produktionsbetrieb
+#
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# Die App lauscht auf 127.0.0.1:3000 und wird über einen Reverse Proxy
+# (siehe README) unter https://sponsoring.swisshub.gg veröffentlicht.
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: swisshub-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-swisshub}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD muss in .env gesetzt sein}
+      POSTGRES_DB: ${POSTGRES_DB:-swisshub}
+      # Deterministic collation keeps index behaviour identical across hosts.
+      POSTGRES_INITDB_ARGS: '--encoding=UTF8 --locale=C'
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-swisshub} -d ${POSTGRES_DB:-swisshub}']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    # Not published on the host – only the app container reaches the database.
+    expose:
+      - '5432'
+    networks:
+      - swisshub
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: swisshub-app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-swisshub}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-swisshub}?schema=public&connection_limit=10
+      AUTH_SECRET: ${AUTH_SECRET:?AUTH_SECRET muss in .env gesetzt sein}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://sponsoring.swisshub.gg}
+      UPLOAD_DIR: /app/uploads
+      MAX_UPLOAD_SIZE: ${MAX_UPLOAD_SIZE:-10485760}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_INITIAL_PASSWORD: ${ADMIN_INITIAL_PASSWORD:-}
+      SESSION_MAX_AGE: ${SESSION_MAX_AGE:-43200}
+      LOGIN_MAX_ATTEMPTS: ${LOGIN_MAX_ATTEMPTS:-8}
+      NODE_ENV: production
+    volumes:
+      # Persistent upload storage – survives every rebuild and redeploy.
+      - uploads:/app/uploads
+    ports:
+      # Bound to localhost; TLS termination happens in the reverse proxy.
+      - '127.0.0.1:${APP_PORT:-3000}:3000'
+    networks:
+      - swisshub
+
+volumes:
+  db_data:
+    driver: local
+  uploads:
+    driver: local
+
+networks:
+  swisshub:
+    driver: bridge

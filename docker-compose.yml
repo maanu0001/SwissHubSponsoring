@@ -1,0 +1,30 @@
+# SwissHub Sponsoring – lokale Entwicklung
+#
+# Startet nur PostgreSQL. Die Anwendung läuft mit `npm run dev` auf dem Host,
+# damit Hot Reload funktioniert.
+#
+#   docker compose up -d
+#   npm run db:migrate && npm run seed && npm run dev
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: swisshub-db-dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: swisshub
+      POSTGRES_PASSWORD: swisshub
+      POSTGRES_DB: swisshub
+    ports:
+      - '5432:5432'
+    volumes:
+      - db_data_dev:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U swisshub -d swisshub']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  db_data_dev:
+    driver: local
