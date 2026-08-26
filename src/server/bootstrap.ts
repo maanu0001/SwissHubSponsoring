@@ -5,6 +5,7 @@ import type { Prisma } from '@prisma/client'
 import { hashPassword } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { env } from '@/lib/env'
+import { defaultVisibilityFor } from '@/lib/pdf-sections'
 import { SETTING_DEFINITIONS } from '@/lib/settings'
 import { sanitizeRichText } from '@/lib/sanitize'
 
@@ -91,15 +92,21 @@ async function seedTemplates(log: Log): Promise<void> {
     if (existing) continue
 
     const structure: Prisma.InputJsonValue = {
-      sections: seed.sections.map((section, index) => ({
-        type: section.type,
-        title: section.title ?? '',
-        subtitle: section.subtitle ?? '',
-        content: sanitizeRichText(section.content ?? ''),
-        data: (section.data ?? {}) as Prisma.InputJsonValue,
-        order: (index + 1) * 10,
-        visible: section.visible !== false,
-      })),
+      sections: seed.sections.map((section, index) => {
+        const defaults = defaultVisibilityFor(section.type)
+        return {
+          type: section.type,
+          title: section.title ?? '',
+          subtitle: section.subtitle ?? '',
+          content: sanitizeRichText(section.content ?? ''),
+          data: (section.data ?? {}) as Prisma.InputJsonValue,
+          order: (index + 1) * 10,
+          visibleOnWeb: section.visible !== false,
+          visibleInShortPdf: defaults.shortPdf,
+          visibleInFullPdf: defaults.fullPdf,
+          pdfOrder: null,
+        }
+      }),
     }
 
     await prisma.pageTemplate.create({

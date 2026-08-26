@@ -60,7 +60,7 @@ export default async function ContentPage() {
               subtitle: section.subtitle ?? '',
               content: section.content ?? '',
               data: parseSectionData(section.data),
-              visible: section.visible,
+              visibility: { web: section.visible, shortPdf: false, fullPdf: false },
             }))}
             tournaments={tournaments}
             partners={partners}

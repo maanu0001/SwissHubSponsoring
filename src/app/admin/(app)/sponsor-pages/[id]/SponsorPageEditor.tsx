@@ -13,10 +13,12 @@ import { SectionListEditor } from '@/components/admin/SectionListEditor'
 import { PagePreview } from '@/components/admin/PagePreview'
 import { PageBenefitsEditor } from '@/components/admin/PageBenefitsEditor'
 import { PageSettingsForm } from '@/components/admin/PageSettingsForm'
+import { PdfExportDialog } from '@/components/admin/PdfExportDialog'
 import { PublishPanel } from '@/components/admin/PublishPanel'
 import { PageStatsPanel } from '@/components/admin/PageStatsPanel'
 import { cn } from '@/lib/cn'
 import { PAGE_STATUS, PAGE_VISIBILITY, SPONSOR_PAGE_SECTION_TYPES } from '@/lib/labels'
+import type { PdfMode } from '@/lib/pdf-sections'
 import type { EditableSection } from '@/components/admin/PageSectionEditor'
 import {
   addSectionAction,
@@ -101,6 +103,7 @@ export function SponsorPageEditor({
   const [tab, setTab] = useState<Tab>(
     TABS.some((entry) => entry.id === initialTab) ? (initialTab as Tab) : 'sections',
   )
+  const [pdfOpen, setPdfOpen] = useState(false)
   const toast = useToast()
   const publicUrl = `${appUrl}/partner/${page.slug}`
   const mediaById = Object.fromEntries(galleryMedia.map((media) => [media.id, media]))
@@ -127,6 +130,9 @@ export function SponsorPageEditor({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            <Button type="button" variant="secondary" size="sm" onClick={() => setPdfOpen(true)}>
+              PDF Export
+            </Button>
             {page.status === 'PUBLISHED' ? (
               <>
                 <CopyButton value={publicUrl} size="sm" />
@@ -194,7 +200,9 @@ export function SponsorPageEditor({
                 formData.set('subtitle', section.subtitle)
                 formData.set('content', section.content)
                 formData.set('data', JSON.stringify(section.data))
-                formData.set('visible', section.visible ? 'true' : 'false')
+                formData.set('visibleOnWeb', section.visibility.web ? 'true' : 'false')
+                formData.set('visibleInShortPdf', section.visibility.shortPdf ? 'true' : 'false')
+                formData.set('visibleInFullPdf', section.visibility.fullPdf ? 'true' : 'false')
                 return updateSectionAction({ status: 'idle' }, formData)
               }}
               onDelete={deleteSectionAction}
@@ -229,6 +237,14 @@ export function SponsorPageEditor({
       ) : null}
 
       {tab === 'stats' ? <PageStatsPanel page={page} views={views} publicUrl={publicUrl} /> : null}
+
+      <PdfExportDialog
+        open={pdfOpen}
+        onClose={() => setPdfOpen(false)}
+        pageId={page.id}
+        published={page.status === 'PUBLISHED'}
+        previewHref={(mode: PdfMode) => `/admin/pdf/sponsor-page/${page.id}?mode=${mode}`}
+      />
     </div>
   )
 }

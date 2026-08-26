@@ -12,8 +12,10 @@ import { useToast } from '@/components/ui/Toast'
 import { cn } from '@/lib/cn'
 import { SECTION_TYPES } from '@/lib/labels'
 import type { SectionData } from '@/lib/section-data'
+import type { SectionVisibility } from '@/lib/pdf-sections'
 
 import { RichTextEditor } from './RichTextEditor'
+import { SectionVisibilityControl, type VisibilityChannel } from './SectionVisibilityControl'
 import { SectionDataEditor } from './editors/SectionDataEditor'
 
 export interface EditableSection {
@@ -23,7 +25,7 @@ export interface EditableSection {
   subtitle: string
   content: string
   data: SectionData
-  visible: boolean
+  visibility: SectionVisibility
 }
 
 export interface PageSectionEditorProps {
@@ -33,7 +35,9 @@ export interface PageSectionEditorProps {
   onToggleExpand: () => void
   onSave: (section: EditableSection) => Promise<boolean>
   onDelete: () => Promise<void>
-  onToggleVisible: (visible: boolean) => Promise<void>
+  onToggleVisible: (channel: VisibilityChannel, visible: boolean) => Promise<void>
+  /** Channels offered; the public main page only has "web". */
+  channels?: VisibilityChannel[]
   tournaments: { id: string; title: string; game: string }[]
   partners: { id: string; name: string }[]
   mediaById: Record<string, Media>
@@ -48,6 +52,7 @@ export function PageSectionEditor({
   onSave,
   onDelete,
   onToggleVisible,
+  channels = ['web', 'shortPdf', 'fullPdf'],
   tournaments,
   partners,
   mediaById,
@@ -77,20 +82,22 @@ export function PageSectionEditor({
     setDirty(false)
   }
 
-  async function toggleVisible() {
-    const next = !draft.visible
-    setDraft((current) => ({ ...current, visible: next }))
+  function toggleChannel(channel: VisibilityChannel, next: boolean) {
+    setDraft((current) => ({ ...current, visibility: { ...current.visibility, [channel]: next } }))
     startTransition(async () => {
-      await onToggleVisible(next)
+      await onToggleVisible(channel, next)
     })
   }
+
+  // A section that is hidden everywhere is dimmed so it stands out in the list.
+  const hiddenEverywhere = channels.every((channel) => !draft.visibility[channel])
 
   return (
     <div
       className={cn(
         'rounded-card border bg-surface transition-colors',
         expanded ? 'border-brand-accent/40' : 'border-line',
-        !draft.visible && 'opacity-70',
+        hiddenEverywhere && 'opacity-60',
       )}
     >
       <div className="flex items-center gap-2 px-2.5 py-2">
@@ -122,26 +129,12 @@ export function PageSectionEditor({
 
         <div className="flex shrink-0 items-center gap-1.5">
           {dirty ? <Badge tone="warning">Ungespeichert</Badge> : null}
-          {!draft.visible ? <Badge tone="neutral">Ausgeblendet</Badge> : null}
 
-          <button
-            type="button"
-            onClick={toggleVisible}
-            aria-label={draft.visible ? 'Sektion ausblenden' : 'Sektion einblenden'}
-            title={draft.visible ? 'Sektion ausblenden' : 'Sektion einblenden'}
-            className="rounded p-1.5 text-fg-subtle transition-colors hover:bg-surface-overlay hover:text-fg"
-          >
-            {draft.visible ? (
-              <svg className="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
-                <path d="M1.8 10S4.6 4.8 10 4.8 18.2 10 18.2 10 15.4 15.2 10 15.2 1.8 10 1.8 10Z" />
-                <circle cx="10" cy="10" r="2.4" />
-              </svg>
-            ) : (
-              <svg className="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
-                <path d="M4.2 4.2 15.8 15.8M8 5.2A7.6 7.6 0 0 1 10 5c5.4 0 8.2 5 8.2 5a13 13 0 0 1-2.6 3.1M5.6 6.9A13 13 0 0 0 1.8 10s2.8 5.2 8.2 5.2c.8 0 1.5-.1 2.2-.3" strokeLinecap="round" />
-              </svg>
-            )}
-          </button>
+          <SectionVisibilityControl
+            value={draft.visibility}
+            channels={channels}
+            onChange={toggleChannel}
+          />
 
           <button
             type="button"

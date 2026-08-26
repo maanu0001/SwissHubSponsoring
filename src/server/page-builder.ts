@@ -7,6 +7,7 @@ import { prisma } from '@/lib/db'
 import { formatAmount } from '@/lib/format'
 import { sanitizeRichText } from '@/lib/sanitize'
 import { parseSectionData, type SectionData } from '@/lib/section-data'
+import { defaultVisibilityFor, type SectionVisibility } from '@/lib/pdf-sections'
 import { uniqueSlug } from '@/lib/slug'
 
 /** Shape a template stores in `structure`. */
@@ -20,7 +21,13 @@ const templateStructureSchema = z.object({
         content: z.string().optional().default(''),
         data: z.unknown().optional(),
         order: z.number().optional(),
-        visible: z.boolean().optional().default(true),
+        // Older blueprints only carry `visible`; it seeds the web channel and
+        // the PDF channels fall back to the per-type defaults.
+        visible: z.boolean().optional(),
+        visibleOnWeb: z.boolean().optional(),
+        visibleInShortPdf: z.boolean().optional(),
+        visibleInFullPdf: z.boolean().optional(),
+        pdfOrder: z.number().nullable().optional(),
       }),
     )
     .default([]),
@@ -39,7 +46,8 @@ export interface TemplateSection {
   content: string
   data: SectionData
   order: number
-  visible: boolean
+  visibility: SectionVisibility
+  pdfOrder: number | null
 }
 
 /** Parse a stored template structure, skipping anything unusable. */
@@ -49,15 +57,24 @@ export function parseTemplateStructure(structure: unknown): TemplateSection[] {
 
   return parsed.data.sections
     .filter((section) => VALID_SECTION_TYPES.has(section.type))
-    .map((section, index) => ({
-      type: section.type as SectionType,
-      title: section.title ?? '',
-      subtitle: section.subtitle ?? '',
-      content: sanitizeRichText(section.content ?? ''),
-      data: parseSectionData(section.data),
-      order: section.order ?? (index + 1) * 10,
-      visible: section.visible !== false,
-    }))
+    .map((section, index) => {
+      const type = section.type as SectionType
+      const defaults = defaultVisibilityFor(type)
+      return {
+        type,
+        title: section.title ?? '',
+        subtitle: section.subtitle ?? '',
+        content: sanitizeRichText(section.content ?? ''),
+        data: parseSectionData(section.data),
+        order: section.order ?? (index + 1) * 10,
+        visibility: {
+          web: section.visibleOnWeb ?? section.visible ?? defaults.web,
+          shortPdf: section.visibleInShortPdf ?? defaults.shortPdf,
+          fullPdf: section.visibleInFullPdf ?? defaults.fullPdf,
+        },
+        pdfOrder: section.pdfOrder ?? null,
+      }
+    })
     .sort((a, b) => a.order - b.order)
 }
 
@@ -81,15 +98,17 @@ export interface GeneratedPage {
   slug: string
 }
 
+/** Dative forms – these are inserted after "mit …" in the generated sentence. */
 const SUPPORT_LABEL: Record<SupportType, string> = {
-  MONEY: 'eine finanzielle Unterstützung',
-  PRIZES: 'Sachpreise',
+  MONEY: 'einem finanziellen Beitrag',
+  PRIZES: 'Sachpreisen',
   GAME_KEYS: 'Game Keys',
   HARDWARE: 'Hardware',
   SERVICES: 'Dienstleistungen',
-  COMBINATION: 'eine Kombination aus Budget und Sachleistungen',
-  OTHER: 'eine individuelle Unterstützung',
+  COMBINATION: 'einer Kombination aus Budget und Sachleistungen',
+  OTHER: 'einer individuellen Unterstützung',
 }
+
 
 /**
  * Build the proposal text shown in the SPONSORING_PROPOSAL section.
@@ -115,9 +134,9 @@ function proposalContent(input: GeneratePageInput, sponsorName: string, tourname
     )
   }
 
-  if (input.requestedSupportText) {
-    parts.push(`<p>${escapeHtml(input.requestedSupportText)}</p>`)
-  }
+  // `requestedSupportText` is deliberately not repeated here: both the web page
+  // and the PDF render it in the highlighted proposal card, and duplicating it
+  // in the body text made the section read twice.
 
   parts.push(
     '<p>Selbstverständlich ist das ein Vorschlag und kein fixes Paket – Umfang und Leistungen stellen wir gerne gemeinsam mit Ihnen zusammen.</p>',
@@ -126,13 +145,6 @@ function proposalContent(input: GeneratePageInput, sponsorName: string, tourname
   return sanitizeRichText(parts.join(''))
 }
 
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-}
 
 /**
  * Create a fully populated, immediately editable sponsor page from a template.
@@ -222,7 +234,10 @@ export async function generateSponsorPage(input: GeneratePageInput): Promise<Gen
             content: content || null,
             data: data as Prisma.InputJsonValue,
             order: (index + 1) * 10,
-            visible: section.visible,
+            visibleOnWeb: section.visibility.web,
+            visibleInShortPdf: section.visibility.shortPdf,
+            visibleInFullPdf: section.visibility.fullPdf,
+            pdfOrder: section.pdfOrder,
           }
         }),
       },

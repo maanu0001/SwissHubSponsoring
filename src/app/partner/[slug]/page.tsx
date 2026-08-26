@@ -65,7 +65,9 @@ export default async function PartnerPage({ params }: { params: Promise<{ slug: 
     }
   }
 
-  const sections = toRenderSections(page.sections)
+  const sections = toRenderSections(
+    page.sections.map((section) => ({ ...section, visible: section.visibleOnWeb })),
+  )
 
   const referencedTournamentIds = new Set<string>()
   if (page.tournamentId) referencedTournamentIds.add(page.tournamentId)

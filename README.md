@@ -11,6 +11,7 @@ Die Anwendung vereint fünf Aufgaben in einem System:
 | **CMS** | Die öffentliche Sponsoring-Seite ohne Codeänderung pflegen |
 | **Turnierverwaltung** | Turniere, Formate, Streamlinks und Bildergalerien |
 | **Medienverwaltung** | Logos, Bilder und Dokumente per Upload oder externer URL |
+| **PDF-Export** | Dieselben Inhalte als Kurzpräsentation oder vollständiges Dossier |
 
 Die Anwendung kommt **ohne KI-Funktionen**, ohne Kontaktformulare, ohne
 E-Mail-Versand und ohne externe Analyse-Dienste aus. Sie läuft vollständig auf
@@ -30,10 +31,11 @@ anderen Managed-Plattform.
 7. [Update-Deployment](#update-deployment)
 8. [Adminkonten](#adminkonten)
 9. [Der typische Arbeitsablauf](#der-typische-arbeitsablauf)
-10. [Architektur](#architektur)
-11. [Sicherheit](#sicherheit)
-12. [Datenschutz](#datenschutz)
-13. [Fehlersuche](#fehlersuche)
+10. [PDF-Export](#pdf-export)
+11. [Architektur](#architektur)
+12. [Sicherheit](#sicherheit)
+13. [Datenschutz](#datenschutz)
+14. [Fehlersuche](#fehlersuche)
 
 ---
 
@@ -453,12 +455,189 @@ So entsteht in wenigen Minuten eine individuelle Sponsorenseite:
 11. **Einstellungen → Seite veröffentlichen.**
 12. **Link kopieren** und in die E-Mail an das Unternehmen einfügen:
     `https://sponsoring.swisshub.gg/partner/digitec`
+13. Optional **PDF Export** öffnen, Kurzpräsentation oder Dossier wählen und die
+    Datei der Sponsoring-Mail anhängen – für Firmen, die keine Links aus
+    E-Mails öffnen dürfen. Siehe [PDF-Export](#pdf-export).
 
 Optional lässt sich unter **Einstellungen → Sichtbarkeit** ein Passwortschutz
 aktivieren. Besucher sehen dann zuerst eine Passwortabfrage.
 
 **Entwürfe und archivierte Seiten sind niemals öffentlich erreichbar** – ein
 Aufruf liefert eine 404-Seite.
+
+---
+
+## PDF-Export
+
+Viele Unternehmen öffnen aus Sicherheitsgründen keine Links aus E-Mails. Jede
+Sponsorenseite lässt sich deshalb zusätzlich als PDF exportieren, das einer
+Sponsoring-Mail direkt angehängt werden kann.
+
+Das PDF wird **aus denselben Daten** erzeugt wie die Sponsorenseite. Es gibt
+keinen zweiten Editor und keine doppelte Datenpflege: Wird der Betrag von
+CHF 2’000 auf CHF 2’500 geändert, steht beim nächsten Export automatisch der
+neue Betrag im Dokument.
+
+### Die beiden Varianten
+
+| Variante | Zweck | Umfang |
+| --- | --- | --- |
+| **Kurzpräsentation** | Erstansprache | Kompakter Pitch, typischerweise 5–7 Seiten |
+| **Vollständiges Dossier** | Firmen mit konkretem Interesse | Alle freigegebenen Sektionen |
+
+Beide werden im Sponsorenseiten-Editor über **PDF Export** erzeugt. Der Dialog
+bietet zusätzlich eine Vorschau, die den echten PDF-Renderer im Browser anzeigt.
+
+### Sichtbarkeit pro Sektion
+
+Jede Sektion einer Sponsorenseite hat drei unabhängige Schalter:
+
+```text
+Website              ✓
+Kurzpräsentation     ✓
+Vollständiges Dossier ✓
+```
+
+Im Editor sitzt die Steuerung als kompakter Chip in der Kopfzeile jeder
+Sektion (`Web · Kurz · Dossier`). So lässt sich beispielsweise eine
+Bildergalerie online zeigen, im kurzen PDF aber weglassen und im Dossier wieder
+aufnehmen.
+
+Sinnvolle Voreinstellungen sind pro Sektionstyp hinterlegt: Der Kurzpitch
+enthält standardmässig nur die Kernargumentation (Hero, persönliche Ansprache,
+Warum diese Partnerschaft, Turnier, Reichweite, Vorschlag, Leistungen, Vision,
+Über SwissHub, Kontakt). Budgetverwendung, Turnierhistorie, Referenzpartner,
+VOD-Links und Galerien landen zunächst nur im Dossier.
+
+Templates speichern diese Einstellungen mit. Beim Erstellen einer Sponsorenseite
+werden sie – wie alle anderen Templatewerte – **einmalig kopiert**. Spätere
+Änderungen am Template verändern bestehende Seiten nicht.
+
+Die Reihenfolge im PDF entspricht der Reihenfolge auf der Sponsorenseite. Im
+Datenmodell existiert zusätzlich ein optionales Feld `pdfOrder`; ist es gesetzt,
+hat es Vorrang. Ein zweiter Seitenbaukasten war dafür bewusst nicht nötig.
+
+### QR-Code
+
+Die Abschlussseite kann einen QR-Code auf die individuelle Sponsorenseite
+enthalten, z. B. `https://sponsoring.swisshub.gg/partner/world-of-games`.
+
+- Der Code wird **lokal auf dem Server** erzeugt (Bibliothek `qrcode`, Ausgabe
+  als SVG). Es wird kein externer QR-Dienst aufgerufen.
+- Bei **Entwürfen** ist der QR-Code automatisch deaktiviert, weil der Link noch
+  nicht erreichbar wäre.
+
+### Technische Umsetzung
+
+- **Engine:** Playwright mit headless Chromium. Der Export läuft vollständig
+  serverseitig – kein `window.print()`, keine Abhängigkeit vom Browser des
+  Admins, kein externer PDF-Dienst.
+- **Eigener Renderer:** Das PDF ist kein Ausdruck der Website. Unter
+  `/admin/pdf/sponsor-page/[id]` liegt ein eigener A4-Renderer ohne Navigation,
+  Animationen, Hover-Zustände oder Buttons.
+- **Seitenaufteilung:** Die Verteilung auf Seiten wird serverseitig berechnet.
+  Jede Seite ist ein fest 210 × 297 mm grosser Block; Karten, KPI-Blöcke und
+  Bilder werden nie über zwei Seiten zerschnitten. Ein Messskript im Renderer
+  meldet überlaufende Seiten im Serverlog.
+- **Schriften:** ausschliesslich lokale Systemschriften (Liberation Sans,
+  DejaVu Sans). Zur Exportzeit wird nichts nachgeladen – der Export funktioniert
+  auch ohne Internetzugang des Servers.
+- **Metadaten:** Titel, Autor, Betreff und Ersteller werden gesetzt.
+- **Branding:** Primär- und Sekundärfarbe kommen aus den Branding-Einstellungen.
+  Eine Farbänderung wirkt sich beim nächsten Export automatisch aus.
+- **Druckfreundlich:** helles Dokument mit dunklen Akzentflächen für Titelblatt,
+  Angebot und Abschluss – auf einem Bürodrucker gut lesbar, ohne
+  vollflächig schwarze Seiten.
+
+### Sicherheit
+
+- Der Export ist ausschliesslich für angemeldete Admins erreichbar; die
+  Berechtigung wird serverseitig geprüft, nicht nur der Button ausgeblendet.
+- Die Renderroute akzeptiert entweder eine Admin-Session **oder** ein kurzlebiges,
+  signiertes Token. Dem Browserprozess wird **kein Session-Cookie**
+  weitergereicht; das Token gilt nur für eine Seite, einen Modus und wenige
+  Minuten.
+- Chromium lädt ausschliesslich die interne Renderroute über Loopback. Alle
+  Anfragen an andere Ursprünge werden abgebrochen – ausgenommen Bilder, damit
+  extern gehostete Logos funktionieren. `file://` ist gesperrt. Sponsorlinks
+  erscheinen im PDF nur als Text bzw. Link, sie werden nie geladen.
+
+### Performance
+
+- Ein Export dauert typischerweise ein bis drei Sekunden.
+- Gleichzeitige Exporte sind begrenzt (`PDF_MAX_CONCURRENT`, Standard 2);
+  weitere Anfragen warten in einer kleinen In-Process-Queue. Eine externe
+  Queue wäre für diese Funktion unverhältnismässig.
+- Der Browser wird nach jedem Export in einem `finally`-Block beendet, auch bei
+  Timeout oder Fehler. Es bleiben keine Prozesse zurück.
+
+### Docker-Anforderungen
+
+Das Produktionsimage installiert Chromium samt Systembibliotheken und
+Schriftpaketen selbst:
+
+```dockerfile
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends fonts-liberation fonts-dejavu-core \
+    && node node_modules/playwright/cli.js install --with-deps chromium
+```
+
+Zusätzlich setzt `docker-compose.prod.yml` `shm_size: 512mb` – die
+Docker-Voreinstellung von 64 MB reicht Chromium nicht und führt zu abstürzenden
+Renderprozessen.
+
+Wer stattdessen ein System-Chromium verwenden möchte, setzt `PDF_CHROMIUM_PATH`
+auf dessen Pfad.
+
+### Fehlersuche PDF-Export
+
+**„Chromium wurde nicht gefunden“**
+Der Browser fehlt im Image oder auf dem Host. Nachinstallieren mit:
+
+```bash
+npx playwright install --with-deps chromium
+```
+
+Alternativ ein vorhandenes Chromium verwenden:
+
+```bash
+PDF_CHROMIUM_PATH=/usr/bin/chromium
+```
+
+**„Chromium konnte nicht starten – es fehlen Systembibliotheken“**
+Typisch für schlanke Images ohne die Chromium-Abhängigkeiten. Lösung:
+
+```bash
+npx playwright install-deps chromium
+```
+
+Manuell entspricht das unter anderem `libnss3`, `libnspr4`, `libatk1.0-0`,
+`libatk-bridge2.0-0`, `libcups2`, `libdrm2`, `libxkbcommon0`, `libxcomposite1`,
+`libxdamage1`, `libxfixes3`, `libxrandr2`, `libgbm1`, `libpango-1.0-0`,
+`libcairo2` und `libasound2`.
+
+**Text erscheint als leere Kästchen**
+Im Image fehlen Schriften. `fonts-liberation` und `fonts-dejavu-core`
+installieren.
+
+**„Der Export ist ausgelastet“**
+Es laufen bereits `PDF_MAX_CONCURRENT` Exporte. Entweder kurz warten oder den
+Wert erhöhen – jeder gleichzeitige Export braucht zusätzlichen Arbeitsspeicher.
+
+**Ein externes Bild fehlt im PDF**
+Nicht erreichbare externe Bilder werden übersprungen, damit der Export nicht
+abbricht; im Serverlog erscheint ein Hinweis. Für zuverlässige Ergebnisse
+Bilder hochladen statt zu verlinken.
+
+**„Die PDF-Erstellung hat zu lange gedauert“**
+Der Export bricht nach 30 Sekunden Ladezeit ab. Meist verursacht durch sehr
+grosse oder langsam ausgelieferte externe Bilder.
+
+**Im Serverlog steht „content overflow on sheet(s)“**
+Eine Sektion enthält mehr Inhalt, als auf ein A4-Blatt passt. Der Export bleibt
+gültig, der betroffene Abschnitt wird aber abgeschnitten. Abhilfe: den Text der
+Sektion kürzen oder die Sektion aufteilen.
 
 ---
 
@@ -483,7 +662,9 @@ src/
 │   │   │   ├── content/               CMS der öffentlichen Seite
 │   │   │   ├── partners/              Partner-Referenzen
 │   │   │   └── settings/              Branding, SEO, Recht, Konto, Protokoll
-│   │   └── preview/sponsor-page/[id]/ Vorschau ohne Admin-Rahmen
+│   │   ├── preview/sponsor-page/[id]/ Vorschau ohne Admin-Rahmen
+│   │   └── pdf/sponsor-page/[id]/     A4-Renderer für den PDF-Export
+│   ├── api/admin/…/pdf/               Erzeugt und liefert die PDF-Datei
 │   ├── api/media/[...path]/           Auslieferung hochgeladener Dateien
 │   ├── api/health/                    Healthcheck für Docker und Proxy
 │   ├── robots.ts, sitemap.ts          SEO
@@ -497,6 +678,7 @@ src/
     ├── actions/                       Server Actions (alle Mutationen)
     ├── page-builder.ts                Template → fertige Sponsorenseite
     ├── render.ts                      Aufbau des Render-Kontexts
+    ├── pdf/                           Datenaufbau, Seitenaufteilung, Chromium
     └── bootstrap.ts                   Idempotentes Seeding beim Start
 ```
 
@@ -524,6 +706,12 @@ gerenderten Frame.
 **Uploads ausserhalb des Bundles.** Dateien liegen in `UPLOAD_DIR` auf einem
 persistenten Volume und werden über `/api/media/...` ausgeliefert. Ein Redeploy
 berührt sie nicht.
+
+**PDF mit serverseitiger Seitenaufteilung.** Der Export benutzt dieselben Daten
+wie die Sponsorenseite, aber einen eigenen A4-Renderer. Welche Inhalte auf
+welches Blatt kommen, entscheidet der Server, bevor der Browser rendert. Das
+macht Seitenzahlen exakt und verhindert, dass eine Leistungskarte oder ein
+KPI-Block über zwei Blätter zerrissen wird.
 
 ---
 

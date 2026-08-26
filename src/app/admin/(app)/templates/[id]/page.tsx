@@ -67,7 +67,7 @@ export default async function TemplateDetailPage({ params }: { params: Promise<{
           subtitle: section.subtitle,
           content: section.content,
           data: section.data,
-          visible: section.visible,
+          visibility: section.visibility,
         }))}
         defaultBenefitIds={template.defaultBenefits.map((entry) => entry.benefitId)}
         benefits={benefits}

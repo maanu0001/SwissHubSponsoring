@@ -16,6 +16,7 @@ import { useToast } from '@/components/ui/Toast'
 import { BenefitSelector } from '@/components/admin/BenefitSelector'
 import { PageSectionEditor, type EditableSection } from '@/components/admin/PageSectionEditor'
 import { SECTION_TYPES, SPONSOR_PAGE_SECTION_TYPES, TEMPLATE_TYPE } from '@/lib/labels'
+import { defaultVisibilityFor } from '@/lib/pdf-sections'
 import { IDLE } from '@/lib/result'
 import {
   deleteTemplateAction,
@@ -78,7 +79,10 @@ export function TemplateEditor({
           subtitle: section.subtitle,
           content: section.content,
           data: section.data,
-          visible: section.visible,
+          visibleOnWeb: section.visibility.web,
+          visibleInShortPdf: section.visibility.shortPdf,
+          visibleInFullPdf: section.visibility.fullPdf,
+          pdfOrder: null,
         })),
       )
       const result = await updateTemplateStructureAction(template.id, payload)
@@ -125,7 +129,7 @@ export function TemplateEditor({
       subtitle: '',
       content: '',
       data: {},
-      visible: true,
+      visibility: defaultVisibilityFor(type),
     }
     setSections((current) => [...current, next])
     setExpanded(next.id)
@@ -202,9 +206,13 @@ export function TemplateEditor({
                       setSections((current) => current.filter((entry) => entry.id !== section.id))
                       setStructureDirty(true)
                     }}
-                    onToggleVisible={async (visible) => {
+                    onToggleVisible={async (channel, visible) => {
                       setSections((current) =>
-                        current.map((entry) => (entry.id === section.id ? { ...entry, visible } : entry)),
+                        current.map((entry) =>
+                          entry.id === section.id
+                            ? { ...entry, visibility: { ...entry.visibility, [channel]: visible } }
+                            : entry,
+                        ),
                       )
                       setStructureDirty(true)
                     }}

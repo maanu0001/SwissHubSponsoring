@@ -95,6 +95,11 @@ export interface SectionInput {
   subtitle: string | null
   content: string | null
   data: unknown
+  /**
+   * Visibility for the channel being rendered. Callers resolve this from the
+   * right column – `visibleOnWeb` for public pages, the PDF flags for exports –
+   * so this module stays channel agnostic.
+   */
   visible: boolean
   order: number
 }

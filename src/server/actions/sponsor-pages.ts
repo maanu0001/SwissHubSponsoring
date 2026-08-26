@@ -12,6 +12,7 @@ import { prisma } from '@/lib/db'
 import { failure, fromError, fromZod, success, type ActionState } from '@/lib/result'
 import { sanitizeRichText } from '@/lib/sanitize'
 import { sectionDataSchema } from '@/lib/section-data'
+import { defaultVisibilityFor } from '@/lib/pdf-sections'
 import { requireUserForAction } from '@/lib/session'
 import { isValidSlug, slugify, uniqueSlug } from '@/lib/slug'
 import { generateSponsorPage } from '@/server/page-builder'
@@ -201,7 +202,9 @@ const sectionSchema = z.object({
   subtitle: z.string().trim().max(300).optional().transform((value) => value || null),
   content: z.string().max(60000).optional(),
   data: z.string().optional(),
-  visible: z.boolean().optional(),
+  visibleOnWeb: z.boolean().optional(),
+  visibleInShortPdf: z.boolean().optional(),
+  visibleInFullPdf: z.boolean().optional(),
 })
 
 export async function updateSectionAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
@@ -213,7 +216,9 @@ export async function updateSectionAction(_previous: ActionState, formData: Form
       subtitle: formData.get('subtitle') ?? undefined,
       content: formData.get('content') ?? undefined,
       data: formData.get('data') ?? undefined,
-      visible: formData.get('visible') === 'true',
+      visibleOnWeb: formData.get('visibleOnWeb') === 'true',
+      visibleInShortPdf: formData.get('visibleInShortPdf') === 'true',
+      visibleInFullPdf: formData.get('visibleInFullPdf') === 'true',
     })
     if (!parsed.success) return fromZod(parsed.error)
 
@@ -242,7 +247,13 @@ export async function updateSectionAction(_previous: ActionState, formData: Form
         // Sanitised again server side – client output is never trusted.
         content: parsed.data.content !== undefined ? sanitizeRichText(parsed.data.content) || null : undefined,
         ...(data !== undefined ? { data } : {}),
-        ...(parsed.data.visible !== undefined ? { visible: parsed.data.visible } : {}),
+        ...(parsed.data.visibleOnWeb !== undefined ? { visibleOnWeb: parsed.data.visibleOnWeb } : {}),
+        ...(parsed.data.visibleInShortPdf !== undefined
+          ? { visibleInShortPdf: parsed.data.visibleInShortPdf }
+          : {}),
+        ...(parsed.data.visibleInFullPdf !== undefined
+          ? { visibleInFullPdf: parsed.data.visibleInFullPdf }
+          : {}),
       },
     })
 
@@ -260,18 +271,44 @@ export async function updateSectionAction(_previous: ActionState, formData: Form
   }
 }
 
-export async function toggleSectionVisibilityAction(id: string, visible: boolean): Promise<ActionState> {
+const CHANNEL_COLUMN = {
+  web: 'visibleOnWeb',
+  shortPdf: 'visibleInShortPdf',
+  fullPdf: 'visibleInFullPdf',
+} as const
+
+export type SectionChannel = keyof typeof CHANNEL_COLUMN
+
+const CHANNEL_LABEL: Record<SectionChannel, string> = {
+  web: 'Website',
+  shortPdf: 'Kurzpräsentation',
+  fullPdf: 'Dossier',
+}
+
+/** Flip a single output channel of one section. */
+export async function toggleSectionVisibilityAction(
+  id: string,
+  channel: SectionChannel,
+  visible: boolean,
+): Promise<ActionState> {
   try {
     await requireUserForAction()
+    const column = CHANNEL_COLUMN[channel]
+    if (!column) return failure('Unbekannter Sichtbarkeitsbereich.')
+
     const section = await prisma.sponsorPageSection.findUnique({
       where: { id },
       include: { page: { select: { id: true, slug: true } } },
     })
     if (!section) return failure('Diese Sektion existiert nicht mehr.')
 
-    await prisma.sponsorPageSection.update({ where: { id }, data: { visible } })
+    await prisma.sponsorPageSection.update({ where: { id }, data: { [column]: visible } })
     revalidatePage(section.page.id, section.page.slug)
-    return success(visible ? 'Sektion eingeblendet.' : 'Sektion ausgeblendet.')
+    return success(
+      visible
+        ? `In „${CHANNEL_LABEL[channel]}“ eingeblendet.`
+        : `Aus „${CHANNEL_LABEL[channel]}“ ausgeblendet.`,
+    )
   } catch (error) {
     return fromError(error)
   }
@@ -315,12 +352,15 @@ export async function addSectionAction(pageId: string, type: SectionType): Promi
       select: { order: true },
     })
 
+    const defaults = defaultVisibilityFor(type)
     const section = await prisma.sponsorPageSection.create({
       data: {
         sponsorPageId: pageId,
         type,
         order: (last?.order ?? 0) + 10,
-        visible: true,
+        visibleOnWeb: defaults.web,
+        visibleInShortPdf: defaults.shortPdf,
+        visibleInFullPdf: defaults.fullPdf,
         data: {},
       },
     })
@@ -652,7 +692,10 @@ export async function duplicateSponsorPageAction(id: string): Promise<ActionStat
             content: section.content,
             data: (section.data ?? {}) as Prisma.InputJsonValue,
             order: section.order,
-            visible: section.visible,
+            visibleOnWeb: section.visibleOnWeb,
+            visibleInShortPdf: section.visibleInShortPdf,
+            visibleInFullPdf: section.visibleInFullPdf,
+            pdfOrder: section.pdfOrder,
           })),
         },
         benefits: {

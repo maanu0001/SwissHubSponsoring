@@ -12,8 +12,10 @@ import { useToast } from '@/components/ui/Toast'
 import { SECTION_TYPES } from '@/lib/labels'
 import type { ActionState } from '@/lib/result'
 import { idSignature, useServerState } from '@/lib/use-server-state'
+import { defaultVisibilityFor } from '@/lib/pdf-sections'
 
 import { PageSectionEditor, type EditableSection } from './PageSectionEditor'
+import type { VisibilityChannel } from './SectionVisibilityControl'
 
 export interface SectionListEditorProps {
   sections: EditableSection[]
@@ -21,7 +23,9 @@ export interface SectionListEditorProps {
   availableTypes: SectionType[]
   onSave: (section: EditableSection) => Promise<ActionState>
   onDelete: (id: string) => Promise<ActionState>
-  onToggleVisible: (id: string, visible: boolean) => Promise<ActionState>
+  onToggleVisible: (id: string, channel: VisibilityChannel, visible: boolean) => Promise<ActionState>
+  /** Channels offered per section. The CMS of the main page only has "web". */
+  channels?: VisibilityChannel[]
   onReorder: (orderedIds: string[]) => Promise<ActionState>
   onAdd: (type: SectionType) => Promise<ActionState>
   tournaments: { id: string; title: string; game: string }[]
@@ -42,6 +46,7 @@ export function SectionListEditor({
   onToggleVisible,
   onReorder,
   onAdd,
+  channels = ['web', 'shortPdf', 'fullPdf'],
   tournaments,
   partners,
   mediaById,
@@ -91,11 +96,15 @@ export function SectionListEditor({
     }
   }
 
-  async function handleToggleVisible(id: string, visible: boolean) {
-    const result = await onToggleVisible(id, visible)
+  async function handleToggleVisible(id: string, channel: VisibilityChannel, visible: boolean) {
+    const result = await onToggleVisible(id, channel, visible)
     if (result.status === 'success') {
       setSections((current) =>
-        current.map((section) => (section.id === id ? { ...section, visible } : section)),
+        current.map((section) =>
+          section.id === id
+            ? { ...section, visibility: { ...section.visibility, [channel]: visible } }
+            : section,
+        ),
       )
       router.refresh()
     } else {
@@ -114,7 +123,7 @@ export function SectionListEditor({
           subtitle: '',
           content: '',
           data: {},
-          visible: true,
+          visibility: defaultVisibilityFor(type),
         }
         setSections((current) => [...current, created])
         setExpanded(created.id)
@@ -161,7 +170,8 @@ export function SectionListEditor({
               onToggleExpand={() => setExpanded(expanded === section.id ? null : section.id)}
               onSave={handleSave}
               onDelete={() => handleDelete(section.id)}
-              onToggleVisible={(visible) => handleToggleVisible(section.id, visible)}
+              channels={channels}
+              onToggleVisible={(channel, visible) => handleToggleVisible(section.id, channel, visible)}
               tournaments={tournaments}
               partners={partners}
               mediaById={mediaById}

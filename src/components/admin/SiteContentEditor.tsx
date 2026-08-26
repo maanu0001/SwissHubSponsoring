@@ -38,11 +38,13 @@ export function SiteContentEditor({ sections, tournaments, partners, galleryMedi
         formData.set('subtitle', section.subtitle)
         formData.set('content', section.content)
         formData.set('data', JSON.stringify(section.data))
-        formData.set('visible', section.visible ? 'true' : 'false')
+        formData.set('visible', section.visibility.web ? 'true' : 'false')
         return updateSiteSectionAction({ status: 'idle' }, formData)
       }}
       onDelete={deleteSiteSectionAction}
-      onToggleVisible={toggleSiteSectionAction}
+      // The public main page has no PDF export, so only the web channel applies.
+      channels={['web']}
+      onToggleVisible={(id, _channel, visible) => toggleSiteSectionAction(id, visible)}
       onReorder={reorderSiteSectionsAction}
       onAdd={addSiteSectionAction}
     />

@@ -2,7 +2,7 @@
   "name": "swisshub-sponsoring",
   "version": "1.0.0",
   "private": true,
-  "description": "SwissHub Sponsoring Platform \u2013 Sponsor CRM, CMS and generator for individual sponsoring pages",
+  "description": "SwissHub Sponsoring Platform – Sponsor CRM, CMS and generator for individual sponsoring pages",
   "engines": {
     "node": ">=20.9.0"
   },
@@ -34,6 +34,10 @@
     "bcryptjs": "3.0.3",
     "clsx": "2.1.1",
     "next": "15.5.23",
+    "pdf-lib": "1.17.1",
+    "playwright": "1.62.1",
+    "playwright-core": "1.62.1",
+    "qrcode": "1.5.4",
     "react": "19.1.9",
     "react-dom": "19.1.9",
     "sanitize-html": "2.17.7",
@@ -45,6 +49,7 @@
     "@eslint/eslintrc": "^3.3.6",
     "@tailwindcss/typography": "0.5.16",
     "@types/node": "22.18.11",
+    "@types/qrcode": "1.5.6",
     "@types/react": "19.1.13",
     "@types/react-dom": "19.1.9",
     "@types/sanitize-html": "2.16.0",

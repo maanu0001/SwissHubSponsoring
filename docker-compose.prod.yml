@@ -50,9 +50,17 @@ services:
       SESSION_MAX_AGE: ${SESSION_MAX_AGE:-43200}
       LOGIN_MAX_ATTEMPTS: ${LOGIN_MAX_ATTEMPTS:-8}
       NODE_ENV: production
+      # PDF export. The headless browser only ever loads the app's own render
+      # route over loopback inside this container.
+      PDF_INTERNAL_BASE_URL: ${PDF_INTERNAL_BASE_URL:-http://127.0.0.1:3000}
+      PDF_MAX_CONCURRENT: ${PDF_MAX_CONCURRENT:-2}
+      PDF_CHROMIUM_PATH: ${PDF_CHROMIUM_PATH:-}
     volumes:
       # Persistent upload storage – survives every rebuild and redeploy.
       - uploads:/app/uploads
+    # Chromium renders the PDF in this container; the 64 MB Docker default for
+    # /dev/shm is not enough and leads to crashed render processes.
+    shm_size: '512mb'
     ports:
       # Bound to localhost; TLS termination happens in the reverse proxy.
       - '127.0.0.1:${APP_PORT:-3000}:3000'

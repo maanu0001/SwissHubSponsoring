@@ -162,7 +162,10 @@ const structureSectionSchema = z.object({
   subtitle: z.string().max(300).default(''),
   content: z.string().max(60000).default(''),
   data: z.unknown().optional(),
-  visible: z.boolean().default(true),
+  visibleOnWeb: z.boolean().default(true),
+  visibleInShortPdf: z.boolean().default(true),
+  visibleInFullPdf: z.boolean().default(true),
+  pdfOrder: z.number().nullable().default(null),
 })
 
 /** Replace a template's blueprint sections. Existing pages are never touched. */
@@ -191,7 +194,10 @@ export async function updateTemplateStructureAction(templateId: string, sections
         content: sanitizeRichText(section.content),
         data: (data.success ? data.data : {}) as Prisma.InputJsonValue,
         order: (index + 1) * 10,
-        visible: section.visible,
+        visibleOnWeb: section.visibleOnWeb,
+        visibleInShortPdf: section.visibleInShortPdf,
+        visibleInFullPdf: section.visibleInFullPdf,
+        pdfOrder: section.pdfOrder,
       }
     })
 
@@ -299,7 +305,10 @@ export async function createTemplateFromPageAction(pageId: string, name: string)
             content: section.content ?? '',
             data: section.data ?? {},
             order: (index + 1) * 10,
-            visible: section.visible,
+            visibleOnWeb: section.visibleOnWeb,
+            visibleInShortPdf: section.visibleInShortPdf,
+            visibleInFullPdf: section.visibleInFullPdf,
+            pdfOrder: section.pdfOrder,
           })),
         } as Prisma.InputJsonValue,
         defaultBenefits: {

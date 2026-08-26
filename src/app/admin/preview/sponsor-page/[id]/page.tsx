@@ -35,7 +35,9 @@ export default async function SponsorPagePreview({ params }: { params: Promise<{
 
   if (!page) notFound()
 
-  const sections = toRenderSections(page.sections)
+  const sections = toRenderSections(
+    page.sections.map((section) => ({ ...section, visible: section.visibleOnWeb })),
+  )
 
   const tournamentIds = new Set<string>()
   if (page.tournamentId) tournamentIds.add(page.tournamentId)

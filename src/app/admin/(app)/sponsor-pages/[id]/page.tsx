@@ -5,6 +5,7 @@ import { PageHeader } from '@/components/ui/PageHeader'
 import { prisma } from '@/lib/db'
 import { env } from '@/lib/env'
 import { parseSectionData } from '@/lib/section-data'
+import { visibilityOf } from '@/lib/pdf-sections'
 import { requireUser } from '@/lib/session'
 import { pageViewSeries } from '@/server/analytics'
 
@@ -105,7 +106,7 @@ export default async function SponsorPageEditorRoute({
           subtitle: section.subtitle ?? '',
           content: section.content ?? '',
           data: parseSectionData(section.data),
-          visible: section.visible,
+          visibility: visibilityOf(section),
         }))}
         pageBenefits={page.benefits.map((entry) => ({
           id: entry.id,
