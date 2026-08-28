@@ -20,7 +20,7 @@ export function PdfBlock({ node }: { node: PdfNode }) {
       return (
         <div className={`pdf-block pdf-grid pdf-grid--${node.columns === 2 ? 2 : 3}`}>
           {node.items.map((stat, index) => (
-            <div className="pdf-kpi" key={`${stat.label}-${index}`}>
+            <div className={`pdf-kpi${node.emphasis ? ' pdf-kpi--lg' : ''}`} key={`${stat.label}-${index}`}>
               <p className="pdf-kpi__value">
                 {stat.prefix}
                 {stat.value || formatFallback(stat)}
@@ -223,7 +223,9 @@ export function PdfBlock({ node }: { node: PdfNode }) {
           {node.items.map((partner, index) => (
             <div className="pdf-partner" key={`${partner.name}-${index}`}>
               {partner.logoUrl ? (
-                <img className="pdf-partner__logo" src={partner.logoUrl} alt="" />
+                <span className="pdf-partner__plate">
+                  <img className="pdf-partner__logo" src={partner.logoUrl} alt="" />
+                </span>
               ) : null}
               <p className="pdf-partner__name">{partner.name}</p>
               {partner.description ? <p className="pdf-partner__desc">{partner.description}</p> : null}
@@ -253,21 +255,21 @@ export function PdfBlock({ node }: { node: PdfNode }) {
       const p = node.proposal
       return (
         <div className="pdf-block pdf-proposal">
-          {p.amount ? (
-            <div>
-              <p className="pdf-proposal__label">Gesuchte Unterstützung</p>
-              <p className="pdf-proposal__amount">{p.amount}</p>
-              <p className="pdf-proposal__type">{p.supportTypeLabel}</p>
-            </div>
-          ) : (
-            <div>
-              <p className="pdf-proposal__label">Gesuchte Unterstützung</p>
-              <p className="pdf-proposal__amount" style={{ fontSize: '18pt' }}>
-                {p.supportTypeLabel}
-              </p>
-            </div>
-          )}
-          {p.supportText ? <p className="pdf-proposal__text">{p.supportText}</p> : null}
+          <p className="pdf-proposal__label">Unser Vorschlag</p>
+          {/* With a figure the amount carries the panel; without one the kind
+              of support takes its place and steps down a size so a long label
+              still fits on one or two lines. */}
+          <p className={`pdf-proposal__amount${p.amount ? '' : ' pdf-proposal__amount--sm'}`}>
+            {p.amount ?? p.supportTypeLabel}
+          </p>
+          {p.forLine ? <p className="pdf-proposal__for">{p.forLine}</p> : null}
+          {p.typeNote ? <p className="pdf-proposal__type">{p.typeNote}</p> : null}
+          {p.supportText ? (
+            <>
+              <div className="pdf-proposal__divider" />
+              <p className="pdf-proposal__text">{p.supportText}</p>
+            </>
+          ) : null}
         </div>
       )
     }

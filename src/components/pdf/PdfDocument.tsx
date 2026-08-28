@@ -44,7 +44,7 @@ function Cover({ model }: { model: PdfDocumentModel }) {
   const showSponsorLockup = Boolean(cover.sponsorLogoUrl)
 
   return (
-    <section className="pdf-sheet pdf-sheet--dark" data-pdf-sheet="cover">
+    <section className="pdf-sheet pdf-sheet--cover" data-pdf-sheet="cover">
       <div className="pdf-cover">
         {cover.heroImageUrl ? (
           <div className="pdf-cover__art">
@@ -125,7 +125,12 @@ function ContentSheet({
   model: PdfDocumentModel
 }) {
   return (
-    <section className={`pdf-sheet${page.tone === 'dark' ? ' pdf-sheet--dark' : ''}`} data-pdf-sheet={page.id}>
+    <section
+      className={`pdf-sheet${page.tone === 'feature' ? ' pdf-sheet--feature' : ''}`}
+      data-pdf-sheet={page.id}
+    >
+      <RunningHeader model={model} />
+
       <div className="pdf-body">
         <div className="pdf-flow" data-pdf-flow={page.id}>
           {page.heading?.title || page.heading?.eyebrow || page.heading?.subtitle ? (
@@ -137,6 +142,7 @@ function ContentSheet({
                   {page.heading.continued ? <span className="pdf-continued"> (Fortsetzung)</span> : null}
                 </h2>
               ) : null}
+              {page.heading.title ? <div className="pdf-rule" /> : null}
               {page.heading.subtitle && !page.heading.continued ? (
                 <p className="pdf-sub">{page.heading.subtitle}</p>
               ) : null}
@@ -166,7 +172,7 @@ function Closing({
   const { closing, cover } = model
 
   return (
-    <section className="pdf-sheet pdf-sheet--dark" data-pdf-sheet="closing">
+    <section className="pdf-sheet pdf-sheet--closing" data-pdf-sheet="closing">
       <div className="pdf-body">
         <div className="pdf-closing">
           <p className="pdf-closing__title">{closing.title}</p>
@@ -202,7 +208,7 @@ function Closing({
         </div>
       </div>
 
-      <div className="pdf-footer" style={{ borderTopColor: 'rgb(163 171 180 / 0.3)', color: 'rgb(163 171 180)' }}>
+      <div className="pdf-footer">
         <span>
           {cover.brandName} × {cover.sponsorName}
         </span>
@@ -218,6 +224,40 @@ function Closing({
   )
 }
 
+/**
+ * Slim branding band repeated on every content sheet.
+ *
+ * It sits absolutely inside the sheet's top padding, above the measured flow,
+ * so it carries the SwissHub/sponsor lockup onto every page without costing
+ * the paginator a single millimetre.
+ */
+function RunningHeader({ model }: { model: PdfDocumentModel }) {
+  const { cover } = model
+
+  return (
+    <div className="pdf-runhead">
+      <div className="pdf-runhead__brand">
+        {cover.brandLogoUrl ? (
+          <img className="pdf-runhead__logo" src={cover.brandLogoUrl} alt={cover.brandName} />
+        ) : (
+          <span className="pdf-runhead__word">{cover.brandName}</span>
+        )}
+        <span className="pdf-runhead__times" aria-hidden="true">
+          ×
+        </span>
+        {/* A sponsor logo is preferred; the company name stands in when the
+            sponsor record has no artwork. */}
+        {cover.sponsorLogoUrl ? (
+          <img className="pdf-runhead__sponsorLogo" src={cover.sponsorLogoUrl} alt={cover.sponsorName} />
+        ) : (
+          <span className="pdf-runhead__word">{cover.sponsorName}</span>
+        )}
+      </div>
+      <span className="pdf-runhead__sponsor">{cover.kicker}</span>
+    </div>
+  )
+}
+
 function PdfFooter({
   model,
   pageNumber,
@@ -229,10 +269,9 @@ function PdfFooter({
 }) {
   return (
     <div className="pdf-footer">
-      <span>
-        {model.cover.brandName} × {model.cover.sponsorName}
-        {model.meta.tournamentTitle ? ` · ${model.meta.tournamentTitle}` : ''}
-      </span>
+      {/* The branding lives in the running header, so the footer only carries
+          the context line and the page number. */}
+      <span>{model.meta.tournamentTitle ?? model.cover.sponsorName}</span>
       {model.meta.showPageNumbers ? (
         <span className="pdf-footer__page">
           {pageNumber} / {totalPages}

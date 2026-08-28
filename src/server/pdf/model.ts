@@ -21,7 +21,7 @@ export type PdfNode =
   | { kind: 'html'; html: string }
   | { kind: 'lead'; text: string }
   | { kind: 'bullets'; items: BulletItem[] }
-  | { kind: 'stats'; items: StatItem[]; columns: number }
+  | { kind: 'stats'; items: StatItem[]; columns: number; emphasis?: boolean }
   | { kind: 'budget'; items: BudgetItem[] }
   | { kind: 'steps'; items: ProcessStep[] }
   | { kind: 'quotes'; items: QuoteItem[] }
@@ -59,6 +59,13 @@ export interface PdfPartner {
 export interface PdfProposal {
   amount: string | null
   supportTypeLabel: string
+  /**
+   * Small note under the amount. Null when the kind of support would merely
+   * repeat what the figure already says (a CHF amount is obviously money).
+   */
+  typeNote: string | null
+  /** What the amount buys, e.g. "Partnerschaft für den SwissHub Valorant Cup". */
+  forLine: string | null
   supportText: string | null
   currency: string
 }
@@ -69,8 +76,11 @@ export interface PdfPage {
   /** Section heading rendered at the top of the sheet, if any. */
   heading?: { eyebrow?: string; title?: string; subtitle?: string; continued?: boolean }
   items: PdfItem[]
-  /** Dark treatment for cover and closing sheets. */
-  tone: 'light' | 'dark'
+  /**
+   * Sheet treatment. The document is dark throughout; 'feature' adds the brand
+   * wash that marks the pitch sheets (reach figures, the offer).
+   */
+  tone: 'base' | 'feature'
   /** Cover and closing pages hide the running footer. */
   showFooter: boolean
 }

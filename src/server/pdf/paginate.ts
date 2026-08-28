@@ -10,7 +10,9 @@ export const PAGE = {
   width: 210,
   height: 297,
   paddingX: 17,
-  paddingTop: 17,
+  // The top padding also houses the running header band, which sits absolutely
+  // positioned above the flow. Changing it changes CONTENT_HEIGHT below.
+  paddingTop: 22,
   paddingBottom: 20,
 } as const
 
@@ -33,7 +35,11 @@ export interface SectionPlan {
   items: PdfItem[]
   /** Force this section to start on a fresh sheet. */
   startsNewPage: boolean
-  tone?: 'light' | 'dark'
+  /**
+   * Sheet treatment. Every sheet is dark; 'feature' adds the brand wash used
+   * for the sections that carry the pitch (reach figures, the offer).
+   */
+  tone?: 'base' | 'feature'
 }
 
 /**
@@ -47,7 +53,7 @@ export function paginate(sections: SectionPlan[]): PdfPage[] {
   const pages: PdfPage[] = []
   let used = 0
 
-  function openPage(heading: PdfPage['heading'] | undefined, tone: 'light' | 'dark', headingCost: number): PdfPage {
+  function openPage(heading: PdfPage['heading'] | undefined, tone: PdfPage['tone'], headingCost: number): PdfPage {
     const page: PdfPage = {
       id: `p${pages.length + 1}`,
       heading,
@@ -62,7 +68,7 @@ export function paginate(sections: SectionPlan[]): PdfPage[] {
 
   for (const section of sections) {
     const headingCost = headingHeight(section.heading)
-    const tone = section.tone ?? 'light'
+    const tone = section.tone ?? 'base'
     const items = section.items.filter((item) => item.height > 0)
     if (items.length === 0) continue
 
@@ -71,10 +77,12 @@ export function paginate(sections: SectionPlan[]): PdfPage[] {
 
     // A compact section may share the sheet with the previous one, as long as
     // its heading and at least its first item still fit.
+    // Tones are not compared here: every sheet shares the same dark base, so a
+    // following section reads correctly on a feature sheet. The sheet keeps the
+    // tone of the section that opened it.
     const canShare =
       last !== undefined &&
       !section.startsNewPage &&
-      last.tone === tone &&
       // The +12mm keeps a section from starting with just its heading and a
       // single card squeezed against the bottom edge of a sheet.
       used + headingCost + firstItem.height + 12 <= CONTENT_HEIGHT
@@ -112,7 +120,10 @@ export function paginate(sections: SectionPlan[]): PdfPage[] {
 function renderInlineHeading(heading: { eyebrow?: string; title?: string; subtitle?: string }): string {
   const parts: string[] = ['<div class="pdf-inline-heading">']
   if (heading.eyebrow) parts.push(`<p class="pdf-eyebrow">${escapeHtml(heading.eyebrow)}</p>`)
-  if (heading.title) parts.push(`<h2 class="pdf-h2">${escapeHtml(heading.title)}</h2>`)
+  if (heading.title) {
+    parts.push(`<h2 class="pdf-h2">${escapeHtml(heading.title)}</h2>`)
+    parts.push('<div class="pdf-rule"></div>')
+  }
   if (heading.subtitle) parts.push(`<p class="pdf-sub">${escapeHtml(heading.subtitle)}</p>`)
   parts.push('</div>')
   return parts.join('')

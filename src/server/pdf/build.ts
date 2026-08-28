@@ -163,6 +163,9 @@ export async function buildPdfDocument(
         tournamentId: page.tournamentId,
       },
       sponsorName,
+      proposalForLine: primaryTournament
+        ? `Partnerschaft für den ${primaryTournament.title}`
+        : `Partnerschaft mit ${sponsorName}`,
     })
 
     if (plan && plan.items.length > 0) plans.push(plan)
@@ -246,6 +249,8 @@ interface PlanContext {
     tournamentId: string | null
   }
   sponsorName: string
+  /** Headline under the amount, e.g. "Partnerschaft für den SwissHub Cup". */
+  proposalForLine: string | null
 }
 
 /**
@@ -273,10 +278,14 @@ function planSection(context: PlanContext): SectionPlan | null {
     case 'ABOUT_SWISSHUB': {
       const stats = (data.stats ?? []).filter((stat) => stat.value.trim() || stat.label.trim())
       const columns = Math.min(3, Math.max(2, data.columns ?? 3))
-      for (const chunk of chunkByHeight(stats, columns, 30)) {
+      // The reach figures are the evidence behind the pitch, so they are set
+      // large on their own sheet. Everywhere else the same block stays compact.
+      const emphasis = type === 'REACH'
+      const rowHeight = emphasis ? 40 : 30
+      for (const chunk of chunkByHeight(stats, columns, rowHeight)) {
         items.push({
-          height: gridHeight(chunk.length, columns, 30),
-          node: { kind: 'stats', items: chunk, columns },
+          height: gridHeight(chunk.length, columns, rowHeight),
+          node: { kind: 'stats', items: chunk, columns, emphasis },
         })
       }
       break
@@ -330,12 +339,19 @@ function planSection(context: PlanContext): SectionPlan | null {
         const supportText = context.page.supportText
         // The offer is the page's anchor, so it goes above the explanatory text.
         items.unshift({
-          height: 44 + (supportText ? textHeight(supportText, 70, 5.4) : 0),
+          // Label, amount, the "for" line and the type add up to roughly 62mm
+          // before the explanatory paragraph and its divider are added.
+          height: 62 + (supportText ? textHeight(supportText, 70, 5.4) + 11 : 0),
           node: {
             kind: 'proposal',
             proposal: {
               amount,
               supportTypeLabel: SUPPORT_TYPE[context.page.supportType].label,
+              typeNote:
+                amount && context.page.supportType === 'MONEY'
+                  ? null
+                  : SUPPORT_TYPE[context.page.supportType].label,
+              forLine: context.proposalForLine,
               supportText,
               currency: context.page.currency,
             },
@@ -465,15 +481,21 @@ function planSection(context: PlanContext): SectionPlan | null {
 
   if (items.length === 0) return null
 
+  // The reach figures and the offer are the two blocks a sponsor is meant to
+  // remember, so both carry the brand wash on whatever sheet they open.
+  //
+  // Neither forces a page break. Emphasis here comes from the blocks - figures
+  // set large, the offer in a brand panel - not from isolation: every forced
+  // break simply stranded the section before it on a half empty sheet, which
+  // reads as padding rather than emphasis.
+  const isFeature = type === 'REACH' || type === 'SPONSORING_PROPOSAL'
+
   return {
     key: context.key,
     heading,
     items,
-    // Sections are packed onto sheets in both modes. Forcing a page break per
-    // section produced dossier pages that were only a third full, which reads
-    // as padding rather than substance. The dossier is longer because it
-    // carries more sections, not because each one sits alone on a sheet.
     startsNewPage: false,
+    tone: isFeature ? 'feature' : 'base',
   }
 }
 

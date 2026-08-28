@@ -545,9 +545,21 @@ enthalten, z. B. `https://sponsoring.swisshub.gg/partner/world-of-games`.
 - **Metadaten:** Titel, Autor, Betreff und Ersteller werden gesetzt.
 - **Branding:** Primär- und Sekundärfarbe kommen aus den Branding-Einstellungen.
   Eine Farbänderung wirkt sich beim nächsten Export automatisch aus.
-- **Druckfreundlich:** helles Dokument mit dunklen Akzentflächen für Titelblatt,
-  Angebot und Abschluss – auf einem Bürodrucker gut lesbar, ohne
-  vollflächig schwarze Seiten.
+- **Durchgehendes Dark Theme:** Das PDF verwendet auf allen Seiten dieselben
+  Anthrazit-/Rot-Tokens wie die Web-App (siehe `globals.css`), damit ein Export
+  wie eine zusammenhängende Präsentation wirkt und nicht wie eine gedruckte
+  Webseite. Es gibt bewusst kein helles Theme: Jede Seite füllt A4 vollflächig
+  mit dem dunklen Grund, Karten sind leicht aufgehellte Flächen, Rot bleibt
+  Akzent. Die Kennzahlen- und die Angebotsfläche tragen zusätzlich einen
+  dezenten Brand-Verlauf.
+- **Bildschirm vor Druck:** Die Gestaltung ist auf digitale Weitergabe
+  optimiert. Der Export bleibt auf Papier lesbar, verbraucht dort aber
+  entsprechend Toner.
+- **Hintergründe im Export:** `@page { margin: 0 }`, `printBackground: true`
+  und `print-color-adjust: exact` sorgen dafür, dass der dunkle Grund bis an
+  alle Seitenränder reicht. Die `@media print`-Regel der Web-App (heller Grund
+  beim Ausdruck der öffentlichen Seite) wird im PDF-Stylesheet gezielt
+  überstimmt.
 
 ### Sicherheit
 
